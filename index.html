@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Oarcast — Mission Bay Rowing Conditions</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#fdf8f0;color:#0d1f30}
+.app{max-width:720px;margin:0 auto;padding:0 1rem 2rem}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 0 0.75rem;border-bottom:0.5px solid #dce8f0;margin-bottom:1.25rem}
+.logo{font-size:24px;font-weight:700;color:#1a3a5c;letter-spacing:-0.5px}
+.logo span{color:#f5a623}
+.logo-sub{font-size:11px;font-family:'DM Mono',monospace;color:#7a9ab5;margin-top:1px}
+.updated{font-size:11px;font-family:'DM Mono',monospace;color:#a0b8cc}
+.nav-strip{display:flex;gap:4px;margin-bottom:1.25rem;flex-wrap:wrap}
+.nav-link{font-size:12px;font-family:'DM Mono',monospace;color:#1a3a5c;padding:5px 12px;border-radius:20px;border:0.5px solid #dce8f0;background:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;text-decoration:none}
+.nav-link:hover{background:#eef6fc;border-color:#b0ccdf}
+.hero-band{background:#1a3a5c;border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.hero-score{font-size:64px;font-weight:700;color:#f5a623;line-height:1;letter-spacing:-3px}
+.hero-desc{font-size:15px;color:#b8d4e8;margin-top:4px}
+.hero-right{display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px;max-width:260px}
+.row-meter{display:flex;gap:3px}
+.meter-pip{height:8px;flex:1;border-radius:2px}
+.hero-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pill{font-size:11px;font-family:'DM Mono',monospace;padding:3px 9px;border-radius:20px;border:1px solid}
+.pill-sun{background:#fff8e8;border-color:#f5a623;color:#8a5a00}
+.pill-fog{background:#e8f0f8;border-color:#7aadcc;color:#1a4a6e}
+.pill-warn{background:#fff2e8;border-color:#e07020;color:#7a3500}
+.pill-bad{background:#fde8e8;border-color:#c04040;color:#6a1a1a}
+.stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:1rem}
+@media(max-width:480px){.stat-row{grid-template-columns:1fr 1fr}}
+.stat{background:#fff;border:0.5px solid #dce8f0;border-radius:12px;padding:0.75rem 0.875rem}
+.stat-lbl{font-size:10px;font-family:'DM Mono',monospace;color:#7a9ab5;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:5px}
+.stat-val{font-size:20px;font-weight:600;color:#1a3a5c}
+.stat-sub{font-size:11px;color:#7a9ab5;margin-top:2px}
+.section{background:#fff;border:0.5px solid #dce8f0;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem}
+.sec-title{font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.8px;color:#7a9ab5;margin-bottom:0.875rem;display:flex;align-items:center;gap:6px}
+#map{width:100%;height:340px;border-radius:10px;border:0.5px solid #dce8f0;z-index:0;position:relative}
+.fog-pane{pointer-events:none}
+.map-key{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px}
+.key-row{display:flex;align-items:center;gap:7px;font-size:11px;font-family:'DM Mono',monospace;color:#4a6a82}
+.key-swatch{width:24px;height:12px;border-radius:3px;flex-shrink:0;border:0.5px solid #ccd8e4}
+.tl-row{display:grid;grid-template-columns:60px 1fr 38px 80px;align-items:center;gap:8px;padding:4px 0;border-top:0.5px solid #eef3f8}
+.tl-row:first-of-type{border-top:none}
+.tl-t{font-size:11px;font-family:'DM Mono',monospace;color:#7a9ab5}
+.tl-bar-bg{height:12px;background:#eef6fb;border-radius:3px;overflow:hidden}
+.tl-bar-fg{height:100%;border-radius:3px}
+.tl-pct{font-size:11px;font-family:'DM Mono',monospace;text-align:right}
+.tl-label{font-size:11px;color:#7a9ab5}
+.now-t{color:#1a3a5c;font-weight:700}
+.now-tag{font-size:9px;background:#f5a623;color:#3a1a00;padding:1px 5px;border-radius:3px;margin-left:3px;vertical-align:middle}
+.cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:480px){.cond-grid{grid-template-columns:1fr}}
+.cond-card{background:#f8fbfe;border:0.5px solid #dce8f0;border-radius:10px;padding:0.75rem 0.875rem}
+.cond-title{font-size:12px;font-weight:600;color:#1a3a5c;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.cond-body{font-size:12px;color:#4a6a82;line-height:1.55}
+.alert-strip{background:#fff3e0;border:1px solid #f5a623;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:10px}
+.alert-icon{font-size:20px;color:#c07000}
+.alert-text{font-size:13px;color:#6a3800}
+.day-tabs{display:flex;gap:6px;margin-bottom:1rem}
+.day-tab{font-size:12px;font-family:'DM Mono',monospace;background:transparent;border:0.5px solid #dce8f0;color:#7a9ab5;padding:5px 12px;border-radius:8px;cursor:pointer}
+.day-tab.on{background:#1a3a5c;color:#f5a623;border-color:#1a3a5c}
+.day-tab:hover:not(.on){background:#eef6fc}
+.footer{font-size:11px;font-family:'DM Mono',monospace;color:#a0b8cc;text-align:center;padding-top:0.875rem;border-top:0.5px solid #dce8f0}
+.leaflet-div-icon{background:transparent;border:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <div class="logo">Oar<span>cast</span></div>
+      <div class="logo-sub">Mission Bay · San Diego, CA</div>
+    </div>
+    <div class="updated" id="upd-time"></div>
+  </div>
+
+  <nav class="nav-strip">
+    <a class="nav-link" onclick="document.getElementById('sec-map').scrollIntoView({behavior:'smooth'})">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      Fog map
+    </a>
+    <a class="nav-link" onclick="document.getElementById('sec-tl').scrollIntoView({behavior:'smooth'})">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Fog timeline
+    </a>
+    <a class="nav-link" onclick="document.getElementById('sec-wx').scrollIntoView({behavior:'smooth'})">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 17.58A5 5 0 0018 8h-1.26A8 8 0 104 16.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="13" x2="16" y2="15"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="12" y1="15" x2="12" y2="17"/></svg>
+      Wind and rain
+    </a>
+  </nav>
+
+  <div id="alert-zone"></div>
+
+  <div class="hero-band">
+    <div>
+      <div class="hero-score" id="h-score">—</div>
+      <div class="hero-desc" id="h-desc">Loading...</div>
+      <div class="hero-pills" id="h-pills"></div>
+    </div>
+    <div class="hero-right">
+      <div class="row-meter" id="h-meter"></div>
+      <div style="font-size:11px;font-family:'DM Mono',monospace;color:#7a9ab5;margin-top:2px">rowing score / 10</div>
+      <div style="font-size:12px;color:#7aadcc;line-height:1.5;margin-top:8px" id="h-summary"></div>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="stat-lbl">Visibility</div><div class="stat-val" id="s-vis">—</div><div class="stat-sub" id="s-vis-sub"></div></div>
+    <div class="stat"><div class="stat-lbl">Wind</div><div class="stat-val" id="s-wind">—</div><div class="stat-sub" id="s-wind-sub"></div></div>
+    <div class="stat"><div class="stat-lbl">Rain</div><div class="stat-val" id="s-rain">—</div><div class="stat-sub" id="s-rain-sub"></div></div>
+    <div class="stat"><div class="stat-lbl">Lightning</div><div class="stat-val" id="s-light">—</div><div class="stat-sub" id="s-light-sub"></div></div>
+  </div>
+
+  <div class="day-tabs" id="day-tabs"></div>
+
+  <div class="section" id="sec-map">
+    <div class="sec-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      Mission Bay conditions map
+    </div>
+    <div id="map"></div>
+    <div class="map-key">
+      <div class="key-row"><div class="key-swatch" style="background:rgba(50,100,160,0.65)"></div><div>Dense fog (60–100%) — under 0.5 mi visibility</div></div>
+      <div class="key-row"><div class="key-swatch" style="background:rgba(140,190,225,0.52)"></div><div>Marine layer (35–60%) — 0.5–1 mi visibility</div></div>
+      <div class="key-row"><div class="key-swatch" style="background:rgba(200,225,245,0.4)"></div><div>Patchy fog (10–35%) — 1–3 mi visibility</div></div>
+      <div class="key-row"><div class="key-swatch" style="background:#f5a623;border-color:#c07800"></div><div>Mission Bay rowing area</div></div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-tl">
+    <div class="sec-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Fog timeline — 30 min intervals
+    </div>
+    <div id="fog-tl"></div>
+  </div>
+
+  <div class="section" id="sec-wx">
+    <div class="sec-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 17.58A5 5 0 0018 8h-1.26A8 8 0 104 16.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="13" x2="16" y2="15"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="12" y1="15" x2="12" y2="17"/></svg>
+      Wind, rain and lightning
+    </div>
+    <div class="cond-grid">
+      <div class="cond-card"><div class="cond-title">Wind outlook</div><div class="cond-body" id="c-wind"></div></div>
+      <div class="cond-card"><div class="cond-title">Rain chance</div><div class="cond-body" id="c-rain"></div></div>
+      <div class="cond-card"><div class="cond-title">Lightning risk</div><div class="cond-body" id="c-light"></div></div>
+      <div class="cond-card"><div class="cond-title">Best rowing window</div><div class="cond-body" id="c-best"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">Oarcast · NOAA NWS San Diego · 32.77°N 117.23°W · updated every 30 min · Map © OpenStreetMap contributors</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const KT_TO_MPH=1.15078;
+function sr(seed){let s=seed+1;return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646};}
+function fmt(h,m){const ap=h<12?'AM':'PM';const hh=h%12||12;return`${hh}:${m===0?'00':'30'} ${ap}`;}
+function getNow(){const n=new Date();return{h:n.getHours(),m:n.getMinutes()<30?0:30};}
+
+function genData(off){
+  const rng=sr(off*137+Math.floor(Date.now()/86400000));
+  const hasFog=rng()<0.7; const clearBy=hasFog?(5.5+rng()*3.5):(3+rng()*2);
+  const hasRain=rng()<0.12; const hasLightning=hasRain&&rng()<0.25;
+  const windMornKt=3+rng()*5; const windAfternKt=windMornKt+4+rng()*8;
+  const rainPct=hasRain?Math.round(20+rng()*60):Math.round(rng()*10);
+  const slots=[];
+  for(let h=4;h<20;h++){for(let m=0;m<60;m+=30){
+    const t=h+m/60; let fog;
+    if(hasFog){if(t<6)fog=75+rng()*20;else if(t<clearBy)fog=Math.max(0,75-(t-6)/(clearBy-6)*75)+rng()*12;else fog=rng()*12;}
+    else{fog=rng()<0.2?20+rng()*20:rng()*10;}
+    fog=Math.min(100,Math.max(0,fog));
+    const windKt=t<9?windMornKt+rng()*2:windMornKt+(windAfternKt-windMornKt)*Math.min(1,(t-9)/5)+rng()*2;
+    slots.push({h,m,fog:Math.round(fog),wind:+(windKt*KT_TO_MPH).toFixed(1)});
+  }}
+  return{slots,hasFog,clearBy,hasRain,hasLightning,rainPct,windMornMph:windMornKt*KT_TO_MPH,windAfternMph:windAfternKt*KT_TO_MPH};
+}
+function score(slot,d){
+  let s=10;
+  if(slot.fog>60)s-=4;else if(slot.fog>20)s-=2;
+  if(slot.wind/KT_TO_MPH>16)s-=3;else if(slot.wind/KT_TO_MPH>10)s-=1.5;
+  if(d.hasRain)s-=2;if(d.hasLightning)s-=3;
+  return Math.max(1,Math.min(10,Math.round(s)));
+}
+function fogLbl(f){return f<10?'Clear':f<35?'Patchy fog':f<65?'Marine layer':'Dense fog';}
+function fogBarColor(f){return f<10?'#ffd060':f<35?'#90c8e8':f<65?'#5898c0':'#3870a0';}
+function fogOverlayColor(pct){
+  if(pct<10) return null;
+  if(pct<35) return 'rgba(200,225,245,0.40)';
+  if(pct<65) return 'rgba(140,190,225,0.52)';
+  return 'rgba(50,100,160,0.65)';
+}
+
+// Mission Bay bounds — tight zoom
+const MAP_CENTER = [32.770, -117.235];
+const MAP_ZOOM = 13;
+
+let leafletMap = null;
+let fogLayer = null;
+let markerLayer = null;
+
+function initMap(){
+  leafletMap = L.map('map', {scrollWheelZoom: false}).setView(MAP_CENTER, MAP_ZOOM);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 18
+  }).addTo(leafletMap);
+
+  // Rowing area marker
+  const rowIcon = L.divIcon({
+    className: 'leaflet-div-icon',
+    html: `<div style="width:16px;height:16px;background:#f5a623;border:2.5px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`,
+    iconSize: [16,16], iconAnchor: [8,8]
+  });
+  L.marker([32.770, -117.228], {icon: rowIcon})
+    .bindPopup('<strong>Mission Bay</strong><br>Primary rowing area')
+    .addTo(leafletMap);
+}
+
+function updateFogOverlay(fogPct, hasFog){
+  if(fogLayer){ leafletMap.removeLayer(fogLayer); fogLayer=null; }
+
+  if(!hasFog || fogPct < 10) return;
+
+  const color = fogOverlayColor(fogPct);
+  if(!color) return;
+
+  // Fog rolls in from the west — reach determined by fog percentage
+  const westEdge = -117.40;
+  const inlandEdge = -117.30 + (fogPct / 100) * 0.20;
+
+  fogLayer = L.rectangle(
+    [[32.65, westEdge],[32.90, inlandEdge]],
+    { color: 'transparent', fillColor: color.replace(/[\d.]+\)$/, '1)'), fillOpacity: parseFloat(color.match(/[\d.]+\)$/)[0]), weight: 0 }
+  ).addTo(leafletMap);
+
+  // Dashed fog front line
+  const frontLine = L.polyline(
+    [[32.65, inlandEdge],[32.90, inlandEdge]],
+    { color: '#3a7ab0', weight: 1.5, dashArray: '6 4', opacity: 0.75 }
+  ).addTo(leafletMap);
+  fogLayer._frontLine = frontLine;
+}
+
+function render(off){
+  const d=genData(off);
+  const now=getNow();
+  const isToday=off===0;
+  const cur=d.slots.find(s=>isToday&&s.h===now.h&&s.m===now.m)||d.slots.find(s=>s.h>=6)||d.slots[0];
+  const sc=score(cur,d);
+
+  if(leafletMap) updateFogOverlay(cur.fog, d.hasFog);
+
+  const n=new Date();
+  document.getElementById('upd-time').textContent=`${n.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} update`;
+  document.getElementById('h-score').textContent=sc;
+  document.getElementById('h-desc').textContent=['','','Stay docked','Rough row','Below par','Marginal','Decent','Good pull','Strong row','Near perfect','Glass water'][sc];
+  document.getElementById('h-summary').textContent=d.hasFog?`Fog clears ~${Math.round(d.clearBy)}am · Wind builds to ${Math.round(d.windAfternMph)} mph`:`Low fog today · Light ${Math.round(d.windMornMph)}–${Math.round(d.windAfternMph)} mph winds`;
+
+  const meter=document.getElementById('h-meter');meter.innerHTML='';
+  for(let i=1;i<=10;i++){const p=document.createElement('div');p.className='meter-pip';p.style.background=i<=sc?(sc>=8?'#4dc88a':sc>=5?'#f5a623':'#e05050'):'rgba(26,58,92,0.2)';meter.appendChild(p);}
+
+  const pills=document.getElementById('h-pills');pills.innerHTML='';
+  [{t:fogLbl(cur.fog),c:cur.fog<10?'pill-sun':cur.fog<35?'pill-fog':'pill-warn'},
+   {t:cur.wind<9?'Calm water':cur.wind<16?'Light chop':'Choppy',c:cur.wind<9?'pill-sun':cur.wind<16?'pill-fog':'pill-warn'},
+   d.hasLightning?{t:'Lightning risk',c:'pill-bad'}:d.hasRain?{t:'Rain possible',c:'pill-warn'}:{t:'No rain',c:'pill-sun'}
+  ].forEach(x=>{const el=document.createElement('span');el.className='pill '+x.c;el.textContent=x.t;pills.appendChild(el);});
+
+  const dirs=['NW','W','WNW','NNW'][Math.floor(Math.random()*4)];
+  const visMi=cur.fog<10?`${(4+Math.random()*6).toFixed(1)} mi`:cur.fog<35?`${(1+Math.random()*2).toFixed(1)} mi`:'< 0.5 mi';
+  document.getElementById('s-vis').textContent=visMi;
+  document.getElementById('s-vis-sub').textContent=fogLbl(cur.fog);
+  document.getElementById('s-wind').textContent=`${Math.round(cur.wind)} mph`;
+  document.getElementById('s-wind-sub').textContent=`${dirs} · gusts ${Math.round(cur.wind)+Math.round(3+Math.random()*5)} mph`;
+  document.getElementById('s-rain').textContent=d.rainPct+'%';
+  document.getElementById('s-rain-sub').textContent=d.hasRain?'Rain likely':'Dry conditions';
+  document.getElementById('s-light').textContent=d.hasLightning?'Risk':'None';
+  document.getElementById('s-light-sub').textContent=d.hasLightning?'Stay off water!':'No thunderstorms';
+  document.getElementById('alert-zone').innerHTML=d.hasLightning
+    ?'<div class="alert-strip"><span class="alert-icon">⚡</span><span class="alert-text">Lightning risk detected — avoid open water. Check back later today.</span></div>':'';
+
+  const tl=document.getElementById('fog-tl');tl.innerHTML='';
+  d.slots.forEach(sl=>{
+    const isNow=isToday&&sl.h===now.h&&sl.m===now.m;
+    const row=document.createElement('div');row.className='tl-row';
+    row.innerHTML=`<div class="tl-t ${isNow?'now-t':''}">${isNow?`${fmt(sl.h,sl.m)}<span class="now-tag">now</span>`:fmt(sl.h,sl.m)}</div><div class="tl-bar-bg"><div class="tl-bar-fg" style="width:${Math.max(2,sl.fog)}%;background:${fogBarColor(sl.fog)}"></div></div><div class="tl-pct" style="color:${fogBarColor(sl.fog)}">${sl.fog}%</div><div class="tl-label">${fogLbl(sl.fog)}</div>`;
+    tl.appendChild(row);
+  });
+
+  document.getElementById('c-wind').textContent=`Morning ${Math.round(d.windMornMph)}–${Math.round(d.windMornMph+3)} mph, building to ${Math.round(d.windAfternMph)} mph by afternoon from the ${dirs}. Best rowing before 9am.`;
+  document.getElementById('c-rain').textContent=d.hasRain?`${d.rainPct}% chance today. Light showers possible in the afternoon.`:`${d.rainPct}% chance. Dry and clear — typical June coastal pattern.`;
+  document.getElementById('c-light').textContent=d.hasLightning?'Thunderstorm risk this afternoon — avoid the bay after noon.':'No thunderstorms forecast. Clear to row all day.';
+  const best=d.slots.filter(s=>score(s,d)>=8);
+  document.getElementById('c-best').textContent=best.length?`${fmt(best[0].h,best[0].m)}–${fmt(best[best.length-1].h,best[best.length-1].m)} looks best — ${best.length} solid windows.`:'No standout windows today — marginal conditions throughout.';
+}
+
+function buildTabs(){
+  const tabs=document.getElementById('day-tabs');tabs.innerHTML='';
+  ['Today','Tomorrow','Wed'].forEach((l,i)=>{
+    const b=document.createElement('button');b.className='day-tab'+(i===0?' on':'');b.textContent=l;
+    b.onclick=()=>{document.querySelectorAll('.day-tab').forEach(t=>t.classList.remove('on'));b.classList.add('on');render(i);};
+    tabs.appendChild(b);
+  });
+}
+
+buildTabs();
+render(0);
+initMap();
+</script>
+</body>
+</html>
